@@ -50,6 +50,52 @@ docker run -it --rm --privileged -e MQTT_PASSWORD='*****' hc-sr04
 docker run -it --rm --privileged --workdir=/workspace -v $(pwd):/workspace --network=ha_network --entrypoint=bash hc-sr04
 ````
 
+- Example of my docker-compose configuration (the `${MQTT_HCSR04_PASSWORD}` is set into a `.env` file):
+
+````bash
+version: '3'
+
+networks:
+  ha_network:
+    external: true
+
+services:
+
+  hcsr04:
+    container_name: hcsr04
+    image: hc-sr04
+    environment:
+      MQTT_PASSWORD: ${MQTT_HCSR04_PASSWORD}
+      VERBOSE: 1
+    restart: always
+    networks:
+      - ha_network
+    privileged: true
+
+  mosquitto:
+    container_name: mosquitto
+    image: eclipse-mosquitto:2.0.18
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 125M
+    networks:
+      - ha_network
+    ports:
+       - '1883:1883'
+    volumes:
+      - mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto/etc/mosquitto/passwd:/etc/mosquitto/passwd
+      - mosquitto/data:/mosquitto/data
+      - mosquitto/log:/mosquitto/log
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-h", "127.0.0.1", "-p", "1880", "-t", "'topic'", "-C", "1", "-E", "-i", "probe", "-W", "3" ]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+````
+
 Credits
 ----
 
