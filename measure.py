@@ -11,7 +11,8 @@ import json
 import os
 import paho.mqtt.client as mqtt
 import math
-from datetime import datetime
+import datetime
+from datetime import date
 
 global GPIO_TRIGGER, GPIO_ECHO, MQTT_HOST, MQTT_PORT, MQTT_USERNAME, MQTT_PASSWORD, MQTT_TOPIC, MQTT_TOPIC_TEMP, MQTT_TOPIC_TEMP_ATTR, INPUT_TEMP, MEASURE_INTERVAL, MEASURE_THRESHOLD, VERBOSE, prev_dist
 
@@ -28,8 +29,8 @@ GPIO_TRIGGER         = int(get_env('GPIO_TRIGGER', 23))
 GPIO_ECHO            = int(get_env('GPIO_ECHO', 24))
 MQTT_HOST            = get_env('MQTT_HOST', 'mosquitto')
 MQTT_PORT            = int(get_env('MQTT_PORT', 1883))
-MQTT_USERNAME        = get_env('MQTT_USERNAME', 'hcsr04')
-MQTT_PASSWORD        = get_env('MQTT_PASSWORD', '******')
+MQTT_USERNAME        = get_env('MQTT_USERNAME', '')
+MQTT_PASSWORD        = get_env('MQTT_PASSWORD', '')
 MQTT_TOPIC           = get_env('MQTT_TOPIC', 'hcsr042mqtt/distancemeter')
 MQTT_TOPIC_TEMP      = get_env('MQTT_TOPIC_TEMP', 'zigbee2mqtt/zigbee_poolroom_temp')
 MQTT_TOPIC_TEMP_ATTR = get_env('MQTT_TOPIC_TEMP_ATTR', 'temperature')
@@ -39,6 +40,7 @@ MEASURE_THRESHOLD    = float(get_env('MEASURE_THRESHOLD', 0.5))
 VERBOSE              = int(get_env('VERBOSE', 0))
 
 prev_dist = int(0)
+log_date_format = "%Y-%m-%d %H:%M:%S"
 config = f"""
 HC-SR05 device measurement
 
@@ -50,12 +52,12 @@ MQTT:
 - Host : {MQTT_HOST}
 - Port : {MQTT_PORT}
 - Username : {MQTT_USERNAME}
-- Write Distance Topic: {MQTT_TOPIC}
-- Read Temperature Topic: {MQTT_TOPIC_TEMP}
-- Read Temperature Topic Attribute: {MQTT_TOPIC_TEMP_ATTR}
+- Distance Topic (publish/write): {MQTT_TOPIC}
+- Temperature Topic (subscribe/read): {MQTT_TOPIC_TEMP}
+- Temperature Topic Attribute: {MQTT_TOPIC_TEMP_ATTR}
 
 Script Parameters:
-- Initial Temperature: {INPUT_TEMP}°C (Will be updated when Temperature sensor will publish MQTT message)
+- Initial Temperature: {INPUT_TEMP}°C (If a temperature sensor is set, it will be updated when the temperature sensor publishes a MQTT message)
 - Measure Interval: {MEASURE_INTERVAL} seconds
 - Measure Threashold: {MEASURE_THRESHOLD} cm
 - Verbose output: {VERBOSE}
@@ -63,23 +65,25 @@ Script Parameters:
 print(config)
 
 GPIO.setmode(GPIO.BCM)             # GPIO Mode (BOARD / BCM)
+GPIO.setwarnings(False)            # Disable RuntimeWarning: This channel is already in use, continuing anyway.
 GPIO.setup(GPIO_TRIGGER, GPIO.OUT) # Set GPIO direction OUT
 GPIO.setup(GPIO_ECHO, GPIO.IN)     # Set GPIO direction IN
 
 def on_connect(client, userdata, flags, rc):
-  global MQTT_TOPIC_TEMP
+  global MQTT_TOPIC, MQTT_TOPIC_TEMP
   if VERBOSE: print(">>> DEBUG: on_connect callback")
   if VERBOSE: print(">>>        Connected with result code "+str(rc))
-  if VERBOSE: print(">>>        Subscribe on %s topic" % MQTT_TOPIC_TEMP)
-  client.subscribe(MQTT_TOPIC_TEMP) # Subscribe to the MQTT temperature sensor topic
+  if len(MQTT_TOPIC_TEMP) > 0:
+    if VERBOSE: print(">>>        Subscribe on %s topic" % MQTT_TOPIC_TEMP)
+    client.subscribe(MQTT_TOPIC_TEMP) # Subscribe to the MQTT temperature sensor topic
   
 def on_message(client, userdata, msg):
-  global INPUT_TEMP, MQTT_TOPIC_TEMP, MQTT_TOPIC_TEMP_ATTR
+  global INPUT_TEMP, MQTT_TOPIC_TEMP, MQTT_TOPIC_TEMP_ATTR, log_date_format
   m_decode=str(msg.payload.decode("utf-8","ignore"))
   m_in=json.loads(m_decode)
   INPUT_TEMP = m_in[MQTT_TOPIC_TEMP_ATTR]
   if VERBOSE: print(">>> DEBUG: On Message callback")
-  print("TMP: Temperature message received from MQTT topic %s (Attr: %s). New temperature: %.2f°C" % (MQTT_TOPIC_TEMP, MQTT_TOPIC_TEMP_ATTR, INPUT_TEMP))
+  print("%s - TMPERATURE: Temperature message received from MQTT topic %s (Attr: %s). New temperature: %.2f°C" % (datetime.datetime.now().strftime(log_date_format), MQTT_TOPIC_TEMP, MQTT_TOPIC_TEMP_ATTR, INPUT_TEMP))
 
 
 def on_publish(client, userdata, mid):
@@ -88,6 +92,7 @@ def on_publish(client, userdata, mid):
   if VERBOSE: print(">>>        Publish callback. Message ID: %.0f" % mid)
   
 def distance():
+  global log_date_format
   GPIO.output(GPIO_TRIGGER, True) # Set Trigger to HIGH
   time.sleep(0.00001) # Set Trigger after 0.01ms to LOW
   GPIO.output(GPIO_TRIGGER, False)
@@ -102,14 +107,14 @@ def distance():
   # and divide by 2, because there and back
   # distance = (TimeElapsed * 34300) / 2
   distance = ( TimeElapsed * ( 331.3 + 0.606 * INPUT_TEMP ) * 100 ) / 2
-  print("RAW: StartTime: %f, StopTime: %f, TimeElapsed: %f, distance = %.2f cm, temp: %.2f°C" % (StartTime, StopTime, TimeElapsed, distance,INPUT_TEMP))    
-  return distance, TimeElapsed, StartTime
+  print("%s - MEASURE: Temperature: %.2f °C, TimeElapsed: %f s, Distance = %.6f cm." % (datetime.datetime.now().strftime(log_date_format), INPUT_TEMP, TimeElapsed, distance))
+  return distance, TimeElapsed
 
 def subscribing():
   client.loop_forever()
 
 def main():
-  global prev_dist
+  global prev_dist, log_date_format
   client.on_publish = on_publish
   time.sleep(2)
   try:
@@ -117,16 +122,17 @@ def main():
       dist_tab = distance()
       dist = dist_tab[0]
       if not math.isclose(prev_dist, dist, abs_tol=MEASURE_THRESHOLD):
-        print("PUB: Tolerance threashold of %.2f cm exceeded (prev dist: %.2f, new dist: %.2f). Publish new distance to MQTT topic %s" % (MEASURE_THRESHOLD, prev_dist, dist, MQTT_TOPIC))
-        payload = "{\"distance\": %.2f, \"time\": %f, \"duration\": %.6f, \"temp\": %.2f}" % (dist,dist_tab[2],dist_tab[2],INPUT_TEMP)
-        print("PUB: payload: %s" % payload)
+        dtime = datetime.datetime.now().strftime(log_date_format)
+        payload = "{\"distance\": %.2f, \"time\": \"%s\", \"duration\": %.6f, \"temp\": %.2f}" % (dist, dtime, dist_tab[1], INPUT_TEMP)
+        print("%s - PUBLISH: Tolerance threashold of %.2f cm exceeded (prev dist: %.2f, new dist: %.2f). Publish new distance to MQTT topic %s. Payload: %s" % (dtime, MEASURE_THRESHOLD, prev_dist, dist, MQTT_TOPIC, payload))
         client.publish(MQTT_TOPIC, payload)
       prev_dist = dist
       time.sleep(MEASURE_INTERVAL)
   except KeyboardInterrupt:
     print("Stopped by user")
     GPIO.cleanup()
-    client.unsubscribe(MQTT_TOPIC_TEMP)
+    if len(MQTT_TOPIC_TEMP) > 0:
+      client.unsubscribe(MQTT_TOPIC_TEMP)
     client.disconnect()
 
 # MQTT
@@ -134,11 +140,13 @@ client = mqtt.Client("hc-sr04")
 client.on_connect = on_connect
 client.username_pw_set(username=MQTT_USERNAME,password=MQTT_PASSWORD)
 client.connect(host=MQTT_HOST, port=MQTT_PORT, keepalive=60)
-  
+
 # Separated threads (subscribe and publish)
-sub=threading.Thread(target=subscribing)
+if len(MQTT_TOPIC_TEMP) > 0:
+  sub=threading.Thread(target=subscribing)
 pub=threading.Thread(target=main)
 
 ### Start MAIN
-sub.start()
+if len(MQTT_TOPIC_TEMP) > 0:
+  sub.start()
 pub.start()
