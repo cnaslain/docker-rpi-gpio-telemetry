@@ -60,7 +60,7 @@ docker run -it --rm --privileged --workdir=/workspace -v $(pwd):/workspace --net
 
 - Example of my docker-compose configuration (the `${MQTT_PASSWORD}` variable is set into a `.env` file):
 
-````bash
+````yaml
 version: '3'
 
 networks:
@@ -102,6 +102,91 @@ services:
       interval: 10s
       timeout: 10s
       retries: 6
+````
+
+Home Assistant
+----
+
+Configure Home Assistant (`configuration.yaml`) with:
+
+- A new MQTT `sensor` to read the distance published from HC-SR04 measurement.
+
+````yaml
+mqtt:
+  sensor:
+    - name: hcsr042_distance_meter
+      state_topic: "hcsr042mqtt/distancemeter"
+      unit_of_measurement: "cm"
+      value_template: "{{ value_json.distance }}"
+````
+
+- Two `input_number` entry. One to set the sensor height from the ground. One to set the maximum height of water allowed:
+
+````yaml
+input_number:
+  hcsr04_sensor_height:
+    initial: 65
+    min: 0
+    max: 150
+    step: 0.5
+    unit_of_measurement: 'cm'
+    icon: mdi:waves-arrow-up
+  hcsr04_max_height_water:
+    initial: 20
+    min: 0
+    max: 100
+    step: 0.5
+    unit_of_measurement: 'cm'
+    icon: mdi:tape-measure
+````
+
+- One `sensor` to calculate the water height from the MQTT distance.
+
+````bash
+sensors:
+  hcsr04_water_height:
+    unit_of_measurement: 'cm'
+    icon_template: mdi:waves-arrow-up
+    value_template: >
+      {% if (states('sensor.hcsr042_distance_meter') in ['unavailable', 'unknown', 'none'])
+         or (states('input_number.hcsr04_sensor_height') in ['unavailable', 'unknown', 'none'])
+      %}
+        {{ states('sensor.hcsr04_water_height') }}
+      {% else %}
+        {{ states('input_number.hcsr04_sensor_height') | float - states('sensor.hcsr042_distance_meter') | float }}
+      {% endif %}
+````
+
+- One automation to trigger the poolroom pump and extract the unwanted water
+
+````yaml
+alias: Leak pump management using HC-SR04 sensor
+trigger:
+  - platform: numeric_state
+    entity_id:
+      - sensor.hcsr04_water_height
+    above: input_number.hcsr04_max_height_water
+  - platform: numeric_state
+    entity_id:
+      - sensor.hcsr04_water_height
+    below: input_number.hcsr04_max_height_water
+condition: []
+action:
+  - if:
+      - >-
+        {{ states('sensor.hcsr04_water_height') >
+        states('input_number.hcsr04_max_height_water') }}
+    then:
+      - service: switch.turn_on
+        data: {}
+        target:
+          entity_id: switch.zigbee_poolroom_leakpump
+    else:
+      - service: switch.turn_off
+        data: {}
+        target:
+          entity_id: switch.zigbee_poolroom_leakpump
+mode: single
 ````
 
 Credits

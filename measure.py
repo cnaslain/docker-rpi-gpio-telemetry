@@ -76,6 +76,7 @@ def on_connect(client, userdata, flags, rc):
   if len(MQTT_TOPIC_TEMP) > 0:
     if VERBOSE: print(">>>        Subscribe on %s topic" % MQTT_TOPIC_TEMP)
     client.subscribe(MQTT_TOPIC_TEMP) # Subscribe to the MQTT temperature sensor topic
+    client.on_message = on_message
   
 def on_message(client, userdata, msg):
   global INPUT_TEMP, MQTT_TOPIC_TEMP, MQTT_TOPIC_TEMP_ATTR, log_date_format
@@ -106,8 +107,9 @@ def distance():
   # multiply with the sonic speed (34300 cm/s at 20°C otherwise soundSpeed = 331.3 + (0.606 * tempAir) in m/s)
   # and divide by 2, because there and back
   # distance = (TimeElapsed * 34300) / 2
-  distance = ( TimeElapsed * ( 331.3 + 0.606 * INPUT_TEMP ) * 100 ) / 2
-  print("%s - MEASURE: Temperature: %.2f °C, TimeElapsed: %f s, Distance = %.6f cm." % (datetime.datetime.now().strftime(log_date_format), INPUT_TEMP, TimeElapsed, distance))
+  sound_speed = ( 331.3 + ( 0.606 * INPUT_TEMP ) ) * 100
+  distance = TimeElapsed * sound_speed / 2
+  print("%s - MEASURE: Temperature: %.2f °C, SoundSpeed: %.2f, TimeElapsed: %f s, Distance = %.2f cm." % (datetime.datetime.now().strftime(log_date_format), INPUT_TEMP, sound_speed, TimeElapsed, distance))
   return distance, TimeElapsed
 
 def subscribing():
