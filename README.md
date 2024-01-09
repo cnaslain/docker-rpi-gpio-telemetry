@@ -37,7 +37,7 @@ The main program is `measure.py`. Here are the environment variables you can set
 | INPUT_TEMP    | 20 | Initial value of the air temperature (in °C)|
 | MEASURE_INTERVAL | 10 | Interval between to distance measures (in seconds) |
 | MEASURE_THRESHOLD| 0.5 | Threshold distance; if the difference between two measures is less that this value, no message will be published to MQTT (in cm) |
-| VERBOSE | 0 | Verbose output option (boolean 0|1) |
+| VERBOSE | 0 | Verbose output option (boolean 0\|1) |
 
 - Build the docker image:
 
@@ -76,6 +76,12 @@ services:
       MQTT_PASSWORD: ${MQTT_PASSWORD}
       VERBOSE: 1
     restart: always
+    healthcheck:
+      test: pgrep -f measure.py || exit 1
+      interval: 60s
+      retries: 5
+      start_period: 10s
+      timeout: 10s
     networks:
       - ha_network
     privileged: true
