@@ -73,6 +73,9 @@ def on_connect(client, userdata, flags, rc):
   global MQTT_TOPIC, MQTT_TOPIC_TEMP
   if VERBOSE: print(">>> DEBUG: on_connect callback")
   if VERBOSE: print(">>>        Connected with result code "+str(rc))
+  if rc > 0:
+    print("ERROR: Cannot connect to MQTT broker.")
+    os._exit(1)
   if len(MQTT_TOPIC_TEMP) > 0:
     if VERBOSE: print(">>>        Subscribe on %s topic" % MQTT_TOPIC_TEMP)
     client.subscribe(MQTT_TOPIC_TEMP) # Subscribe to the MQTT temperature sensor topic
@@ -113,7 +116,7 @@ def distance():
   return distance, TimeElapsed
 
 def subscribing():
-  client.loop_forever()
+  client.loop_forever(timeout=.1)
 
 def main():
   global prev_dist, log_date_format
