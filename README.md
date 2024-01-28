@@ -27,6 +27,7 @@ The main program is `measure.py`. Here are the environment variables you can set
 |:-------------:|:-------------:|:-------:|
 | GPIO_TRIGGER  | 23 | GPIO trigger pin |
 | GPIO_ECHO     | 24 | GPIO echo pin |
+| MQTT_CLIENT_NAME | hc-sr04 | MQTT Connexion client name |
 | MQTT_HOST     | mosquitto | MQTT broker host name (must be reacheable from this container)|
 | MQTT_PORT     | 1883 | MQTT broker port |
 | MQTT_USERNAME |  | MQTT broker user name |

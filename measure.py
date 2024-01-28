@@ -27,6 +27,7 @@ def get_env(key, fallback):
 # Variables
 GPIO_TRIGGER         = int(get_env('GPIO_TRIGGER', 23))
 GPIO_ECHO            = int(get_env('GPIO_ECHO', 24))
+MQTT_CLIENT_NAME     = get_env('MQTT_CLIENT_NAME', 'hc-sr04')
 MQTT_HOST            = get_env('MQTT_HOST', 'mosquitto')
 MQTT_PORT            = int(get_env('MQTT_PORT', 1883))
 MQTT_USERNAME        = get_env('MQTT_USERNAME', '')
@@ -110,7 +111,7 @@ def distance():
   # multiply with the sonic speed (34300 cm/s at 20°C otherwise soundSpeed = 331.3 + (0.606 * tempAir) in m/s)
   # and divide by 2, because there and back
   # distance = (TimeElapsed * 34300) / 2
-  sound_speed = ( 331.3 + ( 0.606 * INPUT_TEMP ) ) * 100
+  sound_speed = ( 331.3 + ( 0.606 * INPUT_TEMP ) ) * 100 # speed in cm/s
   distance = TimeElapsed * sound_speed / 2
   print("%s - MEASURE: Temperature: %.2f °C, SoundSpeed: %.2f, TimeElapsed: %f s, Distance = %.2f cm." % (datetime.datetime.now().strftime(log_date_format), INPUT_TEMP, sound_speed, TimeElapsed, distance))
   return distance, TimeElapsed
@@ -141,7 +142,7 @@ def main():
     client.disconnect()
 
 # MQTT
-client = mqtt.Client("hc-sr04")
+client = mqtt.Client(MQTT_CLIENT_NAME)
 client.on_connect = on_connect
 client.username_pw_set(username=MQTT_USERNAME,password=MQTT_PASSWORD)
 client.connect(host=MQTT_HOST, port=MQTT_PORT, keepalive=60)
