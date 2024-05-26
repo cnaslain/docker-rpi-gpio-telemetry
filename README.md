@@ -4,9 +4,11 @@ Docker rpi gpio telemetry
 
 Goal: Create an automation in Home Assistant to power on a pump and drain my parent's poolroom when water level is rising up to a certain level.
 
-![HC-SR05](https://www.framboise314.fr/wp-content/uploads/2014/11/capteur_ultrason_250px.jpg)
+HC-SR05             |  JSN-SR04
+:-------------------------:|:-------------------------:
+![HC-SR05](https://www.framboise314.fr/wp-content/uploads/2014/11/capteur_ultrason_250px.jpg) | [![JSN-SR04](https://...Ocean.png)](https://components101.com/sites/default/files/component_pin/JSN-SR-04T-Pinout.jpg)
 
-To do this, I use an ultrasonic distance sensor (HC-SR05) connected to a Raspberry Pi (GPIO) to measure a distance. The principle is simple: Measure the time an acoustic echo takes to return to the sensor. Multiply it by the sound speed in air and divide it by two (back and forth). The problem is that the air sound speed depends on the temperature. The temperature is retrieved from an MQTT broker, sent by an air temperature and humidity zigbee sensor. With this value, we can calculate a more accurate distance that won't vary between winter and summer (30 °C of temperature difference!).
+To do this, I use an ultrasonic distance sensor (HC-SR05 / JSN-SR04) connected to a Raspberry Pi (GPIO) to measure a distance. The principle is simple: Measure the time an acoustic echo takes to return to the sensor. Multiply it by the sound speed in air and divide it by two (back and forth). The problem is that the air sound speed depends on the temperature. The temperature is retrieved from an MQTT broker, sent by an air temperature and humidity zigbee sensor. With this value, we can calculate a more accurate distance that won't vary between winter and summer (30 °C of temperature difference!).
 
 I did not want to install in my Raspberry Pi any specific software to pilot the device (development tools like gcc to build the GPIO python library, etc.) nor create system services to manage the sensor. The HC-SR05 device management program is driven by a docker service like any other domotic assets (Mosquitto, Home Assistant, zigbee2mqtt, etc.).
 
