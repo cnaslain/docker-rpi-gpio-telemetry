@@ -20,4 +20,4 @@ RUN mkdir /workspace
 ADD measure.py /workspace
 WORKDIR /workspace
 
-ENTRYPOINT ["/usr/local/bin/python", "-u", "measure.py"]
+ENTRYPOINT ["nice", "-n", "5", "/usr/local/bin/python", "-u", "measure.py"]
