@@ -6,7 +6,7 @@ Goal: Create an automation in Home Assistant to power on a pump and drain my par
 
 HC-SR05             |  JSN-SR04
 :-------------------------:|:-------------------------:
-![HC-SR05](https://www.framboise314.fr/wp-content/uploads/2014/11/capteur_ultrason_250px.jpg| width=400) | [![JSN-SR04](https://components101.com/sites/default/files/component_pin/JSN-SR-04T-Pinout.jpg | width=400)
+![HC-SR05](https://www.framboise314.fr/wp-content/uploads/2014/11/capteur_ultrason_250px.jpg){:width="400px"} | [![JSN-SR04](https://components101.com/sites/default/files/component_pin/JSN-SR-04T-Pinout.jpg){:width="400px"}
 
 To do this, I use an ultrasonic distance sensor (HC-SR05 / JSN-SR04) connected to a Raspberry Pi (GPIO) to measure a distance. The principle is simple: Measure the time an acoustic echo takes to return to the sensor. Multiply it by the sound speed in air and divide it by two (back and forth). The problem is that the air sound speed depends on the temperature. The temperature is retrieved from an MQTT broker, sent by an air temperature and humidity zigbee sensor. With this value, we can calculate a more accurate distance that won't vary between winter and summer (30 °C of temperature difference!).
 
